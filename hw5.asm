@@ -124,6 +124,51 @@ insert:
 	jr $ra 			# exit procedure
 	
 search:
+	# $a0 holds id
+	# $a1 points to table
+	# $a2 holds table size
+	div $a0, $a2		# calculate array index (saved into hi)
+	mfhi $t0		# save the array index into $t0 (0 to tablesize-1)
+	
+	sll $t1, $t0, 2		# multiply by 8 to get byte index
+	add $t1, $t1, $a1 	# calculate the address of the spot in the table
+	lw $t2, 0($t1)		# load the address of the record
+	blez $t2, skip		# if the address is 0x0, skip checking it
+	
+	lw $t2, 0($t2)		# load the first word 
+	srl $t2, $t2, 10		# get the id from the word
+	beq $a0, $t2, _item_found	# if the id equals the given id, we found it
+	
+	skip:
+	
+	move $t3, $t1		# make a copy of the record address
+	move $t4, $t0		# make a copy of the original array index
+	addi $t4, $t4, 1	# increment by 1 to start the loop
+	_search_algo:
+		div $t4, $a2	# divide index by table size
+		mfhi $t0	# get hash table index from remainder
+		
+		sll $t1, $t0, 2		# multiply by 4 to get byte index
+		add $t1, $t1, $a1 	# calculate the address of the spot in the table
+		beq $t1, $t3, _no_item_found 	# exit if we've fully looped around
+		lw $t2, 0($t1)		# load the address of the record
+		blez $t2, _skip		# skip checking the id if the address is 0x0
+		lw $t2, 0($t2)		# load the first word 
+		srl $t5, $t2, 10		# get the id from the word
+		beq $a0, $t5, _item_found
+		_skip:
+		addi $t4, $t4, 1		# increment array index
+		j _search_algo
+	
+	_item_found:
+	# $t1 holds address the found address, $a0 holds address of the record to be inserted
+	lw $v0, 0($t1)		# return pointer to the found address
+	move $v1, $t0		# return the index of the record within the hash table
+	jr $ra			# exit procedure
+	
+	_no_item_found:
+	li $v0, 0		# return NULL since we could not find an address
+	li $v1, -1		# return -1 to indicate nothing was found
 	jr $ra 			# exit procedure
 
 delete:
