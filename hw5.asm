@@ -130,7 +130,7 @@ search:
 	div $a0, $a2		# calculate array index (saved into hi)
 	mfhi $t0		# save the array index into $t0 (0 to tablesize-1)
 	
-	sll $t1, $t0, 2		# multiply by 8 to get byte index
+	sll $t1, $t0, 2		# multiply by 4 to get byte index
 	add $t1, $t1, $a1 	# calculate the address of the spot in the table
 	lw $t2, 0($t1)		# load the address of the record
 	blez $t2, skip		# if the address is 0x0, skip checking it
@@ -161,7 +161,7 @@ search:
 		j _search_algo
 	
 	_item_found:
-	# $t1 holds address the found address, $a0 holds address of the record to be inserted
+	# $t1 holds address of the found address, $a0 holds address of the record to be inserted
 	lw $v0, 0($t1)		# return pointer to the found address
 	move $v1, $t0		# return the index of the record within the hash table
 	jr $ra			# exit procedure
@@ -172,4 +172,18 @@ search:
 	jr $ra 			# exit procedure
 
 delete:
+	move $t9, $ra		# store $ra value
+	jal search		# search for id in the table
+	move $ra, $t9		# put proper $ra value back
+	# $v0 holds the address to the record
+	# $v1 holds the index of the id in the table
+	bltz $v1, no_delete	# if no record was found, don't delete anything
+	
+	sll $t1, $v1, 2		# multiply by 4 to get byte index
+	add $t1, $t1, $a1 	# calculate the address of the spot in the table
+	li $t2, -1		# create tombstone value
+	sw $t2, 0($t1)		# change table value at index to tombstone
+	
+	no_delete:
+	move $v0, $v1		# give return value
 	jr $ra			# exit procedure
