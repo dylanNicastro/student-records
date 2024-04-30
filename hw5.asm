@@ -8,7 +8,7 @@ init_student:
 	jr $ra 			# exit procedure
 	
 print_student:
-	move $t2, $a0		# store the bytestring's address in $t0
+	move $t2, $a0		# store the bytestring's address in $t2
 	lw $t0, 0($t2)		# grab the first word of the bytestring
 	srl $t1, $t0, 10	# get the id
 	move $a0, $t1		# put it in $a0
@@ -35,7 +35,7 @@ print_student:
 	jr $ra 			# exit procedure
 	
 init_student_array:
-	move $t9, $a0		# amount of students to add stored in $t0
+	move $t9, $a0		# amount of students to add stored in $t9
 	move $t1, $a1		# grab array of ids
 	move $t2, $a2		# grab array of credits
 	move $t3, $a3		# grab pointer to string of names
@@ -66,7 +66,8 @@ init_student_array:
 		addi $t3, $t3, 1		# increment pointer to the next character (past the null terminator)
 			
 		sll $t5, $t4, 3			# calculate current index of pointer
-		add $t6, $t5, $s0		# calculate address of current record
+		lw $t8, 0($sp)			# get value of stack pointer
+		add $t6, $t5, $t8		# calculate address of current record
 		move $a3, $t6			# load address of current record into $a3
 		
 		move $t5, $ra
@@ -80,6 +81,46 @@ init_student_array:
 	jr $ra 			# exit procedure
 	
 insert:
+	# a0 - record (8 bytes - 2 words)
+	# a1 - address to the start of the table
+	# a2 - size of the table (4 bytes - 1 word)
+	# v0 - return -1 if it could not be placed, index of the record otherwise
+	
+	move $t1, $a0		# store the bytestring's address in $t1
+	lw $t0, 0($t1)		# grab the first word of the bytestring
+	srl $t0, $t0, 10	# get the id
+	div $t0, $a2		# calculate array index (saved into hi)
+	mfhi $t0		# save the array index into $t0 (0 to tablesize-1)
+	
+	sll $t1, $t0, 2		# multiply by 8 to get byte index
+	add $t1, $t1, $a1 	# calculate address of the record at that spot in the table
+	lw $t2, 0($t1)		# load the word
+	blez $t2, _match_found	# if it is null or tombstone, we can place it here
+	
+	move $t3, $t1		# make a copy of the record address
+	move $t4, $t0		# make a copy of the original array index
+	addi $t4, $t4, 1	# increment by 1 to start the loop
+	_probe_algo:
+		div $t4, $a2	# divide index by table size
+		mfhi $t0	# get hash table index from remainder
+		
+		sll $t1, $t0, 2		# multiply by 4 to get byte index
+		add $t1, $t1, $a1 	# calculate address of the record at that spot in the table
+		beq $t1, $t3, _no_match_found 	# exit if we've fully looped around
+		lw $t2, 0($t1)		# load the word
+		blez $t2, _match_found
+		addi $t4, $t4, 1		# increment array index
+		j _probe_algo
+	
+	_match_found:
+	# $t1 holds address of where to insert, $a0 holds address of the record to be inserted
+	sw $a0, 0($t1)		# store the address of the record into the proper place to insert
+	
+	move $v0, $t0		# return the index of the record within the hash table
+	jr $ra			# exit procedure
+	
+	_no_match_found:
+	li $v0, -1		# return -1 to indicate we could not place it in the table
 	jr $ra 			# exit procedure
 	
 search:
